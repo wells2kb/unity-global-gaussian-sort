@@ -74,12 +74,15 @@ void CSCalcDistances (uint3 id : SV_DispatchThreadID)
     if (idx >= _SplatCount)
         return;
 
-    uint origIdx = _SplatSortKeys[idx];
+    // TODO This does not work with one global sort buffer
+    //uint origIdx = _SplatSortKeys[idx];
+    //float3 pos = LoadSplatPos(origIdx);
 
-    float3 pos = LoadSplatPos(origIdx);
+    float3 pos = LoadSplatPos(idx);
     pos = mul(_MatrixMV, float4(pos.xyz, 1)).xyz;
 
-    _SplatSortDistances[idx] = FloatToSortableUint(pos.z);
+    _SplatSortKeys[idx + _SplatGlobalIndex] = idx + _SplatGlobalIndex;
+    _SplatSortDistances[idx + _SplatGlobalIndex] = FloatToSortableUint(pos.z);
 }
 
 RWStructuredBuffer<SplatViewData> _SplatViewData;
