@@ -3,6 +3,7 @@
 
 #pragma kernel CSSetIndices
 #pragma kernel CSCalcDistances
+#pragma kernel CSUsePreviouSort
 #pragma kernel CSCalcViewData
 #pragma kernel CSUpdateEditData
 #pragma kernel CSInitEditData
@@ -44,8 +45,9 @@ float4 _VecScreenParams;
 float4 _VecWorldSpaceCameraPos;
 int _SelectionMode;
 
-RWStructuredBuffer<uint> _SplatSortDistances;
-RWStructuredBuffer<uint> _SplatSortKeys;
+RWStructuredBuffer<uint> _SplatDistances;
+RWStructuredBuffer<uint> _SplatSortedDistances;
+RWStructuredBuffer<uint> _SplatSortedKeys;
 uint _SplatCount;
 uint _SplatGlobalIndex;
 
@@ -64,7 +66,7 @@ void CSSetIndices (uint3 id : SV_DispatchThreadID)
     if (idx >= _SplatCount)
         return;
 
-    _SplatSortKeys[idx] = idx;
+    _SplatSortedKeys[idx] = idx;
 }
 
 [numthreads(GROUP_SIZE,1,1)]
@@ -74,15 +76,20 @@ void CSCalcDistances (uint3 id : SV_DispatchThreadID)
     if (idx >= _SplatCount)
         return;
 
-    // TODO This does not work with one global sort buffer
-    //uint origIdx = _SplatSortKeys[idx];
-    //float3 pos = LoadSplatPos(origIdx);
-
     float3 pos = LoadSplatPos(idx);
     pos = mul(_MatrixMV, float4(pos.xyz, 1)).xyz;
 
-    _SplatSortKeys[idx + _SplatGlobalIndex] = idx + _SplatGlobalIndex;
-    _SplatSortDistances[idx + _SplatGlobalIndex] = FloatToSortableUint(pos.z);
+    _SplatDistances[idx + _SplatGlobalIndex] = FloatToSortableUint(pos.z);
+}
+
+[numthreads(GROUP_SIZE,1,1)]
+void CSUsePreviouSort (uint3 id : SV_DispatchThreadID)
+{
+    uint idx = id.x;
+    if (idx >= _SplatCount)
+        return;
+
+    _SplatSortedDistances[idx] = _SplatDistances[_SplatSortedKeys[idx]];
 }
 
 RWStructuredBuffer<SplatViewData> _SplatViewData;

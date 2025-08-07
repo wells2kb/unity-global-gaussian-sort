@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: MIT
 
+using UnityEngine;
 using Unity.Mathematics;
 
 namespace GaussianSplatting.Runtime
 {
     public static class GaussianUtils
     {
+        public static void DisposeBuffer(ref GraphicsBuffer buf)
+        {
+            buf?.Dispose();
+            buf = null;
+        }
+
         public static float Sigmoid(float v)
         {
             return math.rcp(1.0f + math.exp(-v));
