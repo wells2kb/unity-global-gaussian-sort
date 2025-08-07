@@ -167,13 +167,8 @@ namespace GaussianSplatting.Runtime
                 gs.EnsureMaterials();
 
                 cmb.BeginSample(s_ProfCalcView);
-                gs.CalcViewData(cmb, cam, splatViewData, globalIndex);
+                gs.CalcViewData(cmb, cam, splatViewData, splatDistances, globalIndex);
                 cmb.EndSample(s_ProfCalcView);
-
-                if (sort)
-                    // must recalculate distances to sort
-                    // TODO profiling
-                    gs.CalculateDistances(cmb, cam, splatDistances, globalIndex);
 
                 ++frameCounter;
                 globalIndex += gs.splatCount;
@@ -656,7 +651,7 @@ namespace GaussianSplatting.Runtime
             DestroyImmediate(m_MatDebugBoxes);
         }
 
-        internal void CalcViewData(CommandBuffer cmb, Camera cam, GraphicsBuffer globalSplatViewData, int globalSplatIndex)
+        internal void CalcViewData(CommandBuffer cmb, Camera cam, GraphicsBuffer globalSplatViewData, GraphicsBuffer globalSplatDistances, int globalSplatIndex)
         {
             if (cam.cameraType == CameraType.Preview)
                 return;
@@ -674,6 +669,7 @@ namespace GaussianSplatting.Runtime
             // calculate view dependent data for each splat and write it to the global buffer
             SetAssetDataOnCS(cmb, KernelIndices.CalcViewData);
             cmb.SetComputeBufferParam(m_CSSplatUtilities, (int)KernelIndices.CalcViewData, Props.SplatViewData, globalSplatViewData);
+            cmb.SetComputeBufferParam(m_CSSplatUtilities, (int)KernelIndices.CalcViewData, Props.SplatDistances, globalSplatDistances);
 
             cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixMV, matView * matO2W);
             cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixObjectToWorld, matO2W);
@@ -689,26 +685,6 @@ namespace GaussianSplatting.Runtime
 
             m_CSSplatUtilities.GetKernelThreadGroupSizes((int)KernelIndices.CalcViewData, out uint gsX, out _, out _);
             cmb.DispatchCompute(m_CSSplatUtilities, (int)KernelIndices.CalcViewData, (m_SplatCount + (int)gsX - 1)/(int)gsX, 1, 1);
-        }
-
-        internal void CalculateDistances(CommandBuffer cmd, Camera cam, GraphicsBuffer globalDistances, int globalIndex)
-        {
-            Matrix4x4 worldToCamMatrix = cam.worldToCameraMatrix;
-            worldToCamMatrix.m20 *= -1;
-            worldToCamMatrix.m21 *= -1;
-            worldToCamMatrix.m22 *= -1;
-
-            // calculate distance to the camera for each splat
-            cmd.SetComputeBufferParam(m_CSSplatUtilities, (int)KernelIndices.CalcDistances, Props.SplatDistances, globalDistances);
-            cmd.SetComputeBufferParam(m_CSSplatUtilities, (int)KernelIndices.CalcDistances, Props.SplatChunks, m_GpuChunks);
-            cmd.SetComputeBufferParam(m_CSSplatUtilities, (int)KernelIndices.CalcDistances, Props.SplatPos, m_GpuPosData);
-            cmd.SetComputeIntParam(m_CSSplatUtilities, Props.SplatFormat, (int)m_Asset.posFormat);
-            cmd.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixMV, worldToCamMatrix * transform.localToWorldMatrix);
-            cmd.SetComputeIntParam(m_CSSplatUtilities, Props.SplatCount, m_SplatCount);
-            cmd.SetComputeIntParam(m_CSSplatUtilities, Props.SplatChunkCount, m_GpuChunksValid ? m_GpuChunks.count : 0);
-            cmd.SetComputeIntParam(m_CSSplatUtilities, Props.SplatGlobalIndex, globalIndex);
-            m_CSSplatUtilities.GetKernelThreadGroupSizes((int)KernelIndices.CalcDistances, out uint gsX, out _, out _);
-            cmd.DispatchCompute(m_CSSplatUtilities, (int)KernelIndices.CalcDistances, (m_SplatCount + (int)gsX - 1)/(int)gsX, 1, 1);
         }
 
         public void Update()
