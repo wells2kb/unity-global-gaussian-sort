@@ -50,13 +50,72 @@ v2f vert (uint vtxID : SV_VertexID, uint instID : SV_InstanceID)
         o.col.b = f16tof32(view.color.y >> 16);
         o.col.a = f16tof32(view.color.y);
 
-        uint idx = vtxID;
-        float2 quadPos = float2(idx&1, (idx>>1)&1) * 2.0 - 1.0;
+        // Render with the most efficient number of tris
+        float costRatio = 0.5;
+        float scale = length(view.axis1) * length(view.axis2);
+        float triangleCost = 3 * costRatio + 3 * sqrt(3) * scale;
+        float rectangleCost = 6 * costRatio + 4 * scale;
+        float pentagonCost = 9 * costRatio + 5 * sqrt(5 - 2 * sqrt(5)) * scale;
+
+        // TODO pentagon math
+        // \left(0,\ b\left(\sqrt{5}-1\right)\right)
+        // \left(a\sqrt{\frac{1}{2}\left(5-\sqrt{5}\right)},\ \frac{b}{2}\left(3-\sqrt{5}\right)\right)
+        // \left(a\sqrt{5-2\sqrt{5}},-b\right)
+        float2 quadPos;
+        if (pentagonCost < rectangleCost)
+        {
+           if (vtxID == 0)
+                quadPos = float2(-1, -1);
+            else if (vtxID == 1)
+                quadPos = float2(1, -1);
+            else if (vtxID == 2)
+                quadPos = float2(-1, 1);
+            else if (vtxID == 3)
+                quadPos = float2(1, -1);
+            else if (vtxID == 4)
+                quadPos = float2(1, 1);
+            else if (vtxID == 5)
+                quadPos = float2(-1, 1);
+            else
+                o.vertex = asfloat(0x7fc00000); // NaN discards the primitive
+            o.col = float4(0.0, 0.0, 1.0, 1.0);
+        }
+        else if (rectangleCost < triangleCost)
+        {
+           if (vtxID == 0)
+                quadPos = float2(-1, -1);
+            else if (vtxID == 1)
+                quadPos = float2(1, -1);
+            else if (vtxID == 2)
+                quadPos = float2(-1, 1);
+            else if (vtxID == 3)
+                quadPos = float2(1, -1);
+            else if (vtxID == 4)
+                quadPos = float2(1, 1);
+            else if (vtxID == 5)
+                quadPos = float2(-1, 1);
+            else
+                o.vertex = asfloat(0x7fc00000); // NaN discards the primitive
+
+            o.col = float4(0.0, 1.0, 0.0, 1.0);
+        }
+        else
+        {
+           if (vtxID == 0)
+                quadPos = float2(-sqrt(3), -1);
+            else if (vtxID == 1)
+                quadPos = float2(sqrt(3), -1);
+            else if (vtxID == 2)
+                quadPos = float2(0, 2);
+            else
+              o.vertex = asfloat(0x7fc00000); // NaN discards the primitive
+          o.col = float4(1.0, 0.0, 0.0, 1.0);
+        }
+
         quadPos *= 2;
-
         o.pos = quadPos;
-
         float2 deltaScreenPos = (quadPos.x * view.axis1 + quadPos.y * view.axis2) * 2 / _ScreenParams.xy;
+
         o.vertex = centerClipPos;
         o.vertex.xy += deltaScreenPos * centerClipPos.w;
 

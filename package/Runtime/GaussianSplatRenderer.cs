@@ -55,7 +55,6 @@ namespace GaussianSplatting.Runtime
         GraphicsBuffer splatDistances;
         GraphicsBuffer splatSortedKeys;
         GraphicsBuffer splatSortedDistances;
-        GraphicsBuffer splatIndexBuffer;
 
         GpuSorting splatSorter = new GpuSorting(splatComputeUtilities);
         GpuSorting.Args splatSorterArgs;
@@ -73,7 +72,6 @@ namespace GaussianSplatting.Runtime
             GaussianUtils.DisposeBuffer(ref splatSortedKeys);
             GaussianUtils.DisposeBuffer(ref splatDistances);
             GaussianUtils.DisposeBuffer(ref splatSortedDistances);
-            GaussianUtils.DisposeBuffer(ref splatIndexBuffer);
             splatSorterArgs.resources.Dispose();
 
             if (totalSplats > 0)
@@ -82,18 +80,6 @@ namespace GaussianSplatting.Runtime
                 splatDistances = new GraphicsBuffer(GraphicsBuffer.Target.Structured, totalSplats, sizeof(uint));
                 splatSortedKeys = new GraphicsBuffer(GraphicsBuffer.Target.Structured, totalSplats, sizeof(uint));
                 splatSortedDistances = new GraphicsBuffer(GraphicsBuffer.Target.Structured, totalSplats, sizeof(uint));
-
-                ushort[] splatIndexArray = 
-                new ushort[] {
-                    0, 1, 2, 1, 3, 2,
-                    4, 6, 5, 5, 6, 7,
-                    0, 2, 4, 4, 2, 6,
-                    1, 5, 3, 5, 7, 3,
-                    0, 4, 1, 4, 5, 1,
-                    2, 3, 6, 3, 7, 6
-                };
-                splatIndexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, splatIndexArray.Length, sizeof(ushort));
-                splatIndexBuffer.SetData(splatIndexArray);
 
                 InitSortBuffers(totalSplats);
             }
@@ -209,13 +195,13 @@ namespace GaussianSplatting.Runtime
             // TODO profiling
             // cmb.BeginSample(s_ProfDraw);
             
-            int indexCount = 6;
+            int indexCount = 9;
             MeshTopology topology = MeshTopology.Triangles;
 
             MaterialPropertyBlock mpb = new MaterialPropertyBlock();
             mpb.SetBuffer(GaussianSplatRenderer.Props.SplatViewData, splatViewData);
             mpb.SetBuffer(GaussianSplatRenderer.Props.OrderBuffer, splatSortedKeys);
-            cmb.DrawProcedural(splatIndexBuffer, cam.projectionMatrix, splatMaterial, 0, topology, indexCount, splatViewData.count, mpb);
+            cmb.DrawProcedural(cam.projectionMatrix, splatMaterial, 0, topology, indexCount, splatViewData.count, mpb);
             // cmb.EndSample(s_ProfDraw);
 
             // // TODO delete me
